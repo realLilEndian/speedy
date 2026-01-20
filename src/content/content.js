@@ -1,6 +1,9 @@
 // Listen for messages from popup - registered immediately at top level
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'startReading') {
+  // Validate message is from our extension (not from web page or other extensions)
+  if (sender.id !== chrome.runtime.id) return;
+
+  if (message.action === 'startReading' && typeof message.wpm === 'number') {
     initSpeedyReader(message.wpm);
   }
 });
