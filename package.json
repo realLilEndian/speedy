@@ -1,0 +1,10 @@
+{
+  "name": "speedy",
+  "version": "1.0.0",
+  "description": "Chrome extension RSVP speed reader",
+  "scripts": {
+    "build": "mkdir -p build && zip -r build/speedy.zip manifest.json src/ assets/ -x '*.DS_Store'"
+  },
+  "author": "Gareth Heyes",
+  "license": "MIT"
+}

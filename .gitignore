@@ -1,0 +1,17 @@
+# Build output
+build/
+
+# OS files
+.DS_Store
+
+# Dependencies
+node_modules/
+
+# Editor files
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Logs
+*.log
