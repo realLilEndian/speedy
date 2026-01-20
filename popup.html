@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Speedy</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1><img src="icons/logo-32.png" alt="Speedy logo" class="logo">Speedy</h1>
+    <div class="speed-control">
+      <label for="wpm">Speed: <span id="wpm-value">300</span> WPM</label>
+      <input type="range" id="wpm" min="100" max="1000" value="300" step="50">
+    </div>
+    <button id="read-btn">Read Page</button>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
