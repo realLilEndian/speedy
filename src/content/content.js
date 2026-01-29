@@ -17,8 +17,11 @@ function initSpeedyReader(wpm) {
   let isReading = false;
   let currentWordIndex = 0;
   let words = [];
+  let wordPositions = []; // Maps word index to DOM position { textNode, startOffset, endOffset }
   let timeoutId = null;
   let currentWpm = 300;
+  let isViewingPage = false;
+  let currentHighlightMark = null;
 
   function calculateWordDelay(word, baseInterval) {
     let delay = baseInterval;
@@ -42,16 +45,57 @@ function initSpeedyReader(wpm) {
     return delay;
   }
 
-  function extractText() {
+  function extractTextWithPositions() {
     const article = document.querySelector('article') || document.body;
-    const clone = article.cloneNode(true);
 
-    // Remove scripts, styles, and other non-content elements
-    const removeSelectors = 'script, style, noscript, nav, header, footer, aside, [role="navigation"], [role="banner"], [aria-hidden="true"]';
-    clone.querySelectorAll(removeSelectors).forEach(el => el.remove());
+    // Selectors for elements to skip
+    const skipSelectors = 'script, style, noscript, nav, header, footer, aside, [role="navigation"], [role="banner"], [aria-hidden="true"]';
+    const skipElements = new Set(article.querySelectorAll(skipSelectors));
 
-    const text = clone.innerText || clone.textContent;
-    return text.split(/\s+/).filter(word => word.trim().length > 0);
+    const extractedWords = [];
+    const positions = [];
+
+    // Walk through all text nodes in the original DOM
+    const walker = document.createTreeWalker(
+      article,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode: function(node) {
+          // Skip if inside a non-content element
+          let parent = node.parentElement;
+          while (parent && parent !== article) {
+            if (skipElements.has(parent) ||
+                ['SCRIPT', 'STYLE', 'NOSCRIPT', 'NAV', 'HEADER', 'FOOTER', 'ASIDE'].includes(parent.tagName)) {
+              return NodeFilter.FILTER_REJECT;
+            }
+            parent = parent.parentElement;
+          }
+          // Skip empty text nodes
+          if (!node.textContent.trim()) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      }
+    );
+
+    let textNode;
+    while (textNode = walker.nextNode()) {
+      const text = textNode.textContent;
+      // Find all words and their positions within this text node
+      const wordRegex = /\S+/g;
+      let match;
+      while ((match = wordRegex.exec(text)) !== null) {
+        extractedWords.push(match[0]);
+        positions.push({
+          textNode: textNode,
+          startOffset: match.index,
+          endOffset: match.index + match[0].length
+        });
+      }
+    }
+
+    return { words: extractedWords, positions: positions };
   }
 
   function createOverlay() {
@@ -180,6 +224,16 @@ function initSpeedyReader(wpm) {
         color: #ff6b35;
         text-decoration: underline;
       }
+      #speedy-overlay.hidden {
+        display: none !important;
+      }
+      .speedy-highlight-mark {
+        background-color: #ffff00 !important;
+        color: #000 !important;
+        padding: 2px 0;
+        border-radius: 2px;
+        box-shadow: 0 0 0 2px #ffff00;
+      }
     `;
     overlay.appendChild(style);
 
@@ -225,6 +279,12 @@ function initSpeedyReader(wpm) {
     pauseBtn.textContent = 'Pause';
     controls.appendChild(pauseBtn);
 
+    const viewPageBtn = document.createElement('button');
+    viewPageBtn.className = 'speedy-btn';
+    viewPageBtn.id = 'speedy-view-page';
+    viewPageBtn.textContent = 'View Page (V)';
+    controls.appendChild(viewPageBtn);
+
     const closeBtn = document.createElement('button');
     closeBtn.className = 'speedy-btn';
     closeBtn.id = 'speedy-close';
@@ -258,6 +318,7 @@ function initSpeedyReader(wpm) {
     document.body.appendChild(overlay);
 
     document.getElementById('speedy-pause').addEventListener('click', togglePause);
+    document.getElementById('speedy-view-page').addEventListener('click', togglePageView);
     document.getElementById('speedy-close').addEventListener('click', closeReader);
 
     // Keyboard controls
@@ -266,10 +327,20 @@ function initSpeedyReader(wpm) {
 
   function handleKeydown(e) {
     if (!overlay) return;
-    if (e.key === 'Escape') closeReader();
-    if (e.key === ' ') {
+    if (e.key === 'Escape') {
+      if (isViewingPage) {
+        togglePageView(); // Return to reader instead of closing
+      } else {
+        closeReader();
+      }
+    }
+    if (e.key === ' ' && !isViewingPage) {
       e.preventDefault();
       togglePause();
+    }
+    if (e.key === 'v' || e.key === 'V') {
+      e.preventDefault();
+      togglePageView();
     }
   }
 
@@ -362,7 +433,10 @@ function initSpeedyReader(wpm) {
   function startReading(wpm) {
     if (!overlay) createOverlay();
 
-    words = extractText();
+    const extracted = extractTextWithPositions();
+    words = extracted.words;
+    wordPositions = extracted.positions;
+
     if (words.length === 0) {
       document.getElementById('speedy-word').textContent = 'No text found';
       return;
@@ -389,6 +463,74 @@ function initSpeedyReader(wpm) {
     doneSpan.style.textShadow = '0 0 8px rgba(255,107,53,0.6)';
     doneSpan.textContent = 'Done!';
     wordEl.appendChild(doneSpan);
+  }
+
+  function highlightWordOnPage(wordIndex) {
+    removePageHighlight();
+
+    if (wordIndex < 0 || wordIndex >= wordPositions.length) return;
+
+    const pos = wordPositions[wordIndex];
+    if (!pos || !pos.textNode || !pos.textNode.parentNode) return;
+
+    try {
+      // Create a range for the word
+      const range = document.createRange();
+      range.setStart(pos.textNode, pos.startOffset);
+      range.setEnd(pos.textNode, pos.endOffset);
+
+      // Wrap the word in a highlight mark
+      const mark = document.createElement('mark');
+      mark.className = 'speedy-highlight-mark';
+      range.surroundContents(mark);
+
+      currentHighlightMark = mark;
+
+      // Scroll into view
+      mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch (e) {
+      // If surroundContents fails (e.g., if range crosses element boundaries),
+      // fall back to scrolling to the text node
+      console.warn('Could not highlight word:', e);
+      pos.textNode.parentElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  function removePageHighlight() {
+    if (currentHighlightMark && currentHighlightMark.parentNode) {
+      // Replace the mark with its text content
+      const text = document.createTextNode(currentHighlightMark.textContent);
+      currentHighlightMark.parentNode.replaceChild(text, currentHighlightMark);
+      // Normalize to merge adjacent text nodes
+      text.parentNode?.normalize();
+    }
+    currentHighlightMark = null;
+  }
+
+  function togglePageView() {
+    if (isViewingPage) {
+      // Return to reading mode
+      removePageHighlight();
+      overlay.classList.remove('hidden');
+      isViewingPage = false;
+      document.getElementById('speedy-view-page').textContent = 'View Page (V)';
+    } else {
+      // Switch to page view
+      // Pause reading if active
+      if (isReading) {
+        isReading = false;
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        document.getElementById('speedy-pause').textContent = 'Resume';
+      }
+
+      overlay.classList.add('hidden');
+      isViewingPage = true;
+      highlightWordOnPage(currentWordIndex);
+      document.getElementById('speedy-view-page').textContent = 'Back to Reader (V)';
+    }
   }
 
   function togglePause() {
@@ -422,12 +564,14 @@ function initSpeedyReader(wpm) {
 
   function closeReader() {
     if (timeoutId) clearTimeout(timeoutId);
+    removePageHighlight();
     if (overlay) {
       overlay.remove();
       overlay = null;
     }
     document.removeEventListener('keydown', handleKeydown);
     isReading = false;
+    isViewingPage = false;
     window.speedyReaderInitialized = false;
   }
 
