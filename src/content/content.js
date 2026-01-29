@@ -177,6 +177,12 @@ function initSpeedyReader(wpm) {
       #speedy-controls {
         margin-top: 60px;
         display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 15px;
+      }
+      .speedy-controls-row {
+        display: flex;
         gap: 20px;
       }
       .speedy-btn {
@@ -273,23 +279,47 @@ function initSpeedyReader(wpm) {
     const controls = document.createElement('div');
     controls.id = 'speedy-controls';
 
+    // First row: navigation and pause
+    const row1 = document.createElement('div');
+    row1.className = 'speedy-controls-row';
+
+    const backBtn = document.createElement('button');
+    backBtn.className = 'speedy-btn';
+    backBtn.id = 'speedy-back';
+    backBtn.textContent = '← Back 10';
+    row1.appendChild(backBtn);
+
     const pauseBtn = document.createElement('button');
     pauseBtn.className = 'speedy-btn';
     pauseBtn.id = 'speedy-pause';
     pauseBtn.textContent = 'Pause';
-    controls.appendChild(pauseBtn);
+    row1.appendChild(pauseBtn);
+
+    const forwardBtn = document.createElement('button');
+    forwardBtn.className = 'speedy-btn';
+    forwardBtn.id = 'speedy-forward';
+    forwardBtn.textContent = 'Forward 10 →';
+    row1.appendChild(forwardBtn);
+
+    controls.appendChild(row1);
+
+    // Second row: view page and close
+    const row2 = document.createElement('div');
+    row2.className = 'speedy-controls-row';
 
     const viewPageBtn = document.createElement('button');
     viewPageBtn.className = 'speedy-btn';
     viewPageBtn.id = 'speedy-view-page';
     viewPageBtn.textContent = 'View Page (V)';
-    controls.appendChild(viewPageBtn);
+    row2.appendChild(viewPageBtn);
 
     const closeBtn = document.createElement('button');
     closeBtn.className = 'speedy-btn';
     closeBtn.id = 'speedy-close';
     closeBtn.textContent = 'Close';
-    controls.appendChild(closeBtn);
+    row2.appendChild(closeBtn);
+
+    controls.appendChild(row2);
 
     overlay.appendChild(controls);
 
@@ -317,7 +347,9 @@ function initSpeedyReader(wpm) {
 
     document.body.appendChild(overlay);
 
+    document.getElementById('speedy-back').addEventListener('click', () => jumpWords(-10));
     document.getElementById('speedy-pause').addEventListener('click', togglePause);
+    document.getElementById('speedy-forward').addEventListener('click', () => jumpWords(10));
     document.getElementById('speedy-view-page').addEventListener('click', togglePageView);
     document.getElementById('speedy-close').addEventListener('click', closeReader);
 
@@ -341,6 +373,14 @@ function initSpeedyReader(wpm) {
     if (e.key === 'v' || e.key === 'V') {
       e.preventDefault();
       togglePageView();
+    }
+    if (e.key === 'ArrowLeft' && !isViewingPage) {
+      e.preventDefault();
+      jumpWords(-10);
+    }
+    if (e.key === 'ArrowRight' && !isViewingPage) {
+      e.preventDefault();
+      jumpWords(10);
     }
   }
 
@@ -530,6 +570,29 @@ function initSpeedyReader(wpm) {
       isViewingPage = true;
       highlightWordOnPage(currentWordIndex);
       document.getElementById('speedy-view-page').textContent = 'Back to Reader (V)';
+    }
+  }
+
+  function jumpWords(count) {
+    if (words.length === 0) return;
+
+    // Pause if currently reading
+    if (isReading) {
+      isReading = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      document.getElementById('speedy-pause').textContent = 'Resume';
+    }
+
+    // Calculate new index with bounds checking
+    const newIndex = Math.max(0, Math.min(words.length - 1, currentWordIndex + count));
+
+    // Only update if index actually changed
+    if (newIndex !== currentWordIndex) {
+      currentWordIndex = newIndex;
+      displayWord(words[currentWordIndex]);
     }
   }
 
