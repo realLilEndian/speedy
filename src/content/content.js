@@ -17,8 +17,30 @@ function initSpeedyReader(wpm) {
   let isReading = false;
   let currentWordIndex = 0;
   let words = [];
-  let intervalId = null;
+  let timeoutId = null;
   let currentWpm = 300;
+
+  function calculateWordDelay(word, baseInterval) {
+    let delay = baseInterval;
+
+    // Add extra time for long words (20ms per character over 5 chars)
+    const lengthThreshold = 5;
+    if (word.length > lengthThreshold) {
+      delay += (word.length - lengthThreshold) * 20;
+    }
+
+    // Add extra time for punctuation
+    const lastChar = word.slice(-1);
+    if ('.!?'.includes(lastChar)) {
+      // End of sentence - longer pause
+      delay += baseInterval * 0.5;
+    } else if (',;:'.includes(lastChar)) {
+      // Mid-sentence pause
+      delay += baseInterval * 0.25;
+    }
+
+    return delay;
+  }
 
   function extractText() {
     const article = document.querySelector('article') || document.body;
@@ -282,6 +304,29 @@ function initSpeedyReader(wpm) {
     document.getElementById('speedy-progress').textContent = `${currentWordIndex + 1} / ${words.length}`;
   }
 
+  function scheduleNextWord() {
+    if (!isReading) return;
+
+    const baseInterval = 60000 / currentWpm;
+    const currentWord = words[currentWordIndex];
+    const delay = calculateWordDelay(currentWord, baseInterval);
+
+    timeoutId = setTimeout(() => {
+      if (!isReading) return;
+
+      currentWordIndex++;
+      if (currentWordIndex >= words.length) {
+        showDoneMessage();
+        document.getElementById('speedy-pause').textContent = 'Restart';
+        isReading = false;
+        return;
+      }
+
+      displayWord(words[currentWordIndex]);
+      scheduleNextWord();
+    }, delay);
+  }
+
   function startReading(wpm) {
     if (!overlay) createOverlay();
 
@@ -294,26 +339,11 @@ function initSpeedyReader(wpm) {
     document.getElementById('speedy-wpm-display').textContent = `${wpm} WPM`;
 
     currentWpm = wpm;
-    const interval = 60000 / wpm;
     currentWordIndex = 0;
     isReading = true;
 
     displayWord(words[0]);
-
-    intervalId = setInterval(() => {
-      if (!isReading) return;
-
-      currentWordIndex++;
-      if (currentWordIndex >= words.length) {
-        clearInterval(intervalId);
-        showDoneMessage();
-        document.getElementById('speedy-pause').textContent = 'Restart';
-        isReading = false;
-        return;
-      }
-
-      displayWord(words[currentWordIndex]);
-    }, interval);
+    scheduleNextWord();
   }
 
   function showDoneMessage() {
@@ -330,36 +360,33 @@ function initSpeedyReader(wpm) {
     const btn = document.getElementById('speedy-pause');
 
     if (currentWordIndex >= words.length && !isReading) {
-      // Restart - need to restart the interval
+      // Restart
       currentWordIndex = 0;
       isReading = true;
       btn.textContent = 'Pause';
       displayWord(words[0]);
-
-      const interval = 60000 / currentWpm;
-      intervalId = setInterval(() => {
-        if (!isReading) return;
-
-        currentWordIndex++;
-        if (currentWordIndex >= words.length) {
-          clearInterval(intervalId);
-          showDoneMessage();
-          btn.textContent = 'Restart';
-          isReading = false;
-          return;
-        }
-
-        displayWord(words[currentWordIndex]);
-      }, interval);
+      scheduleNextWord();
       return;
     }
 
-    isReading = !isReading;
-    btn.textContent = isReading ? 'Pause' : 'Resume';
+    if (isReading) {
+      // Pause - cancel the pending timeout
+      isReading = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      btn.textContent = 'Resume';
+    } else {
+      // Resume - schedule the next word
+      isReading = true;
+      btn.textContent = 'Pause';
+      scheduleNextWord();
+    }
   }
 
   function closeReader() {
-    if (intervalId) clearInterval(intervalId);
+    if (timeoutId) clearTimeout(timeoutId);
     if (overlay) {
       overlay.remove();
       overlay = null;
