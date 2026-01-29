@@ -101,12 +101,7 @@ function initSpeedyReader(wpm) {
         height: 25px;
       }
       #speedy-word {
-        position: relative;
-        font-size: 64px;
         color: #fff;
-        letter-spacing: 2px;
-        white-space: nowrap;
-        margin-top: -8px;
       }
       #speedy-word .before {
         color: #fff;
@@ -117,6 +112,23 @@ function initSpeedyReader(wpm) {
       }
       #speedy-word .after {
         color: #fff;
+      }
+      #speedy-words-row {
+        display: flex;
+        align-items: baseline;
+        gap: 0.5em;
+        font-size: 64px;
+        letter-spacing: 2px;
+        white-space: nowrap;
+        margin-top: -8px;
+      }
+      #speedy-prev-word,
+      #speedy-next-word {
+        color: rgba(255, 255, 255, 0.03);
+      }
+      #speedy-prev-word:empty,
+      #speedy-next-word:empty {
+        display: none;
       }
       #speedy-controls {
         margin-top: 60px;
@@ -183,10 +195,23 @@ function initSpeedyReader(wpm) {
     focusLineBottom.id = 'speedy-focus-line-bottom';
     wordContainer.appendChild(focusLineBottom);
 
+    const wordsRow = document.createElement('div');
+    wordsRow.id = 'speedy-words-row';
+
+    const prevWordEl = document.createElement('div');
+    prevWordEl.id = 'speedy-prev-word';
+    wordsRow.appendChild(prevWordEl);
+
     const wordEl = document.createElement('div');
     wordEl.id = 'speedy-word';
     wordEl.textContent = 'Ready';
-    wordContainer.appendChild(wordEl);
+    wordsRow.appendChild(wordEl);
+
+    const nextWordEl = document.createElement('div');
+    nextWordEl.id = 'speedy-next-word';
+    wordsRow.appendChild(nextWordEl);
+
+    wordContainer.appendChild(wordsRow);
 
     overlay.appendChild(wordContainer);
 
@@ -264,6 +289,12 @@ function initSpeedyReader(wpm) {
     const focus = word[focusIndex] || '';
     const after = word.slice(focusIndex + 1);
 
+    // Display previous and next words (dimmed)
+    const prevWordEl = document.getElementById('speedy-prev-word');
+    const nextWordEl = document.getElementById('speedy-next-word');
+    prevWordEl.textContent = currentWordIndex > 0 ? words[currentWordIndex - 1] : '';
+    nextWordEl.textContent = currentWordIndex < words.length - 1 ? words[currentWordIndex + 1] : '';
+
     const wordEl = document.getElementById('speedy-word');
     wordEl.textContent = '';
 
@@ -282,22 +313,23 @@ function initSpeedyReader(wpm) {
     afterSpan.textContent = after;
     wordEl.appendChild(afterSpan);
 
-    // Move word so the focus letter is centered on the fixed line
+    // Move the entire row so the focus letter is centered on the fixed line
     requestAnimationFrame(() => {
       const focusSpan = wordEl.querySelector('.focus');
-      if (focusSpan) {
+      const wordsRow = document.getElementById('speedy-words-row');
+      if (focusSpan && wordsRow) {
         const containerRect = document.getElementById('speedy-word-container').getBoundingClientRect();
         const containerCenter = containerRect.width / 2;
 
         // Reset transform to measure natural position
-        wordEl.style.transform = 'none';
+        wordsRow.style.transform = 'none';
 
         const focusRect = focusSpan.getBoundingClientRect();
         const focusCenterInContainer = focusRect.left + focusRect.width / 2 - containerRect.left;
 
-        // Shift word so focus letter aligns with container center
+        // Shift row so focus letter aligns with container center
         const offset = containerCenter - focusCenterInContainer;
-        wordEl.style.transform = `translateX(${offset}px)`;
+        wordsRow.style.transform = `translateX(${offset}px)`;
       }
     });
 
@@ -347,6 +379,9 @@ function initSpeedyReader(wpm) {
   }
 
   function showDoneMessage() {
+    document.getElementById('speedy-prev-word').textContent = '';
+    document.getElementById('speedy-next-word').textContent = '';
+    document.getElementById('speedy-words-row').style.transform = 'none';
     const wordEl = document.getElementById('speedy-word');
     wordEl.textContent = '';
     const doneSpan = document.createElement('span');
