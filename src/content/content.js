@@ -382,6 +382,25 @@ function initSpeedyReader(wpm) {
       e.preventDefault();
       jumpWords(10);
     }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      adjustSpeed(50);
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      adjustSpeed(-50);
+    }
+  }
+
+  function adjustSpeed(delta) {
+    const minWpm = 100;
+    const maxWpm = 1000;
+    const newWpm = Math.max(minWpm, Math.min(maxWpm, currentWpm + delta));
+
+    if (newWpm !== currentWpm) {
+      currentWpm = newWpm;
+      document.getElementById('speedy-wpm-display').textContent = `${currentWpm} WPM`;
+    }
   }
 
   function findOptimalFocusPoint(word) {
