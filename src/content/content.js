@@ -199,19 +199,13 @@ function initSpeedyReader(wpm) {
         background: #00b4d8;
         box-shadow: 0 0 15px rgba(0, 180, 216, 0.4);
       }
-      #speedy-progress {
-        position: absolute;
-        bottom: 50px;
-        left: 50%;
-        transform: translateX(-50%);
-        color: #4a6fa5;
-        font-size: 14px;
-      }
-      #speedy-wpm-display {
+      #speedy-stats {
         position: absolute;
         bottom: 30px;
         left: 50%;
         transform: translateX(-50%);
+        display: flex;
+        gap: 30px;
         color: #4a6fa5;
         font-size: 14px;
       }
@@ -323,16 +317,26 @@ function initSpeedyReader(wpm) {
 
     overlay.appendChild(controls);
 
-    // Create progress and WPM display
+    // Create stats row (progress, WPM, time remaining)
+    const stats = document.createElement('div');
+    stats.id = 'speedy-stats';
+
     const progress = document.createElement('div');
     progress.id = 'speedy-progress';
     progress.textContent = '0 / 0';
-    overlay.appendChild(progress);
+    stats.appendChild(progress);
 
     const wpmDisplay = document.createElement('div');
     wpmDisplay.id = 'speedy-wpm-display';
     wpmDisplay.textContent = '300 WPM';
-    overlay.appendChild(wpmDisplay);
+    stats.appendChild(wpmDisplay);
+
+    const timeRemaining = document.createElement('div');
+    timeRemaining.id = 'speedy-time-remaining';
+    timeRemaining.textContent = '0:00';
+    stats.appendChild(timeRemaining);
+
+    overlay.appendChild(stats);
 
     // Create credit link
     const credit = document.createElement('div');
@@ -400,7 +404,19 @@ function initSpeedyReader(wpm) {
     if (newWpm !== currentWpm) {
       currentWpm = newWpm;
       document.getElementById('speedy-wpm-display').textContent = `${currentWpm} WPM`;
+      updateTimeRemaining();
     }
+  }
+
+  function updateTimeRemaining() {
+    const wordsLeft = words.length - currentWordIndex - 1;
+    if (wordsLeft <= 0) {
+      document.getElementById('speedy-time-remaining').textContent = '0 min left';
+      return;
+    }
+
+    const minutesLeft = Math.ceil(wordsLeft / currentWpm);
+    document.getElementById('speedy-time-remaining').textContent = `${minutesLeft} min left`;
   }
 
   function findOptimalFocusPoint(word) {
@@ -464,6 +480,7 @@ function initSpeedyReader(wpm) {
     });
 
     document.getElementById('speedy-progress').textContent = `${currentWordIndex + 1} / ${words.length}`;
+    updateTimeRemaining();
   }
 
   function scheduleNextWord() {
